@@ -1,0 +1,4 @@
+In Python you can create a 类 and 继承 it
+In Python you can 判断事情是否满足条件
+In Python you can 用函数库里面的函数
+In Python you can 使用各种类型的数据

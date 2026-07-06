@@ -99,28 +99,28 @@
 # my_tesla.battery.get_range()
 
 
-#restaurant类
-class restaurant():
-    def __init__(self,restaurant_name,cuisine_type):
-        self.restaurant_name = restaurant_name
-        self.cuisine_type = cuisine_type
-    def discribe_restaurant(self):
-        print(f"Restaurant name is {self.restaurant_name.title()}.")
-        print(f"Cuisine type is {self.cuisine_type}.")
-    def open_restaurant(self):
-        print(f"{self.restaurant_name.title()} is open.")
-res1 = restaurant('麦当劳','快餐')
-res2 = restaurant('肯德基','快餐')
-res1.discribe_restaurant()
-res1.open_restaurant()
-res2.discribe_restaurant()
+# #restaurant类
+# class restaurant():
+#     def __init__(self,restaurant_name,cuisine_type):
+#         self.restaurant_name = restaurant_name
+#         self.cuisine_type = cuisine_type
+#     def discribe_restaurant(self):
+#         print(f"Restaurant name is {self.restaurant_name.title()}.")
+#         print(f"Cuisine type is {self.cuisine_type}.")
+#     def open_restaurant(self):
+#         print(f"{self.restaurant_name.title()} is open.")
+# res1 = restaurant('麦当劳','快餐')
+# res2 = restaurant('肯德基','快餐')
+# res1.discribe_restaurant()
+# res1.open_restaurant()
+# res2.discribe_restaurant()
 
-class IceCreamStand(restaurant):
-    def __init__(self,restaurant_name,cuisine_type,flavors):
-        super().__init__(restaurant_name,cuisine_type)
-        self.flavors = flavors
-    def show_flavors(self):
-        print(f"我们提供的冰淇淋口味有: {', '.join(self.flavors)}")
+# class IceCreamStand(restaurant):
+#     def __init__(self,restaurant_name,cuisine_type,flavors):
+#         super().__init__(restaurant_name,cuisine_type)
+#         self.flavors = flavors
+#     def show_flavors(self):
+#         print(f"我们提供的冰淇淋口味有: {', '.join(self.flavors)}")
 
-my_ice_cream = IceCreamStand('甜心小店', '冰淇淋', ['香草', '巧克力', '草莓'])
-my_ice_cream.show_flavors()
+# my_ice_cream = IceCreamStand('甜心小店', '冰淇淋', ['香草', '巧克力', '草莓'])
+# my_ice_cream.show_flavors()
