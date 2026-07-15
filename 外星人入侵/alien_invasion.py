@@ -1,7 +1,12 @@
 import sys
 import pygame
 from settings import Settings
-
+from ship import Ship
+from bullet import Bullet
+from alien import Alien
+import time
+from game_stats import GameStats
+from button import Button
 class AlienInvasion:
     """管理游戏资源和行为的总体类"""
 
@@ -14,6 +19,112 @@ class AlienInvasion:
         self.screen = pygame.display.set_mode(
             (self.settings.screen_width, self.settings.screen_height))
         pygame.display.set_caption("外星人入侵")
+        self.ship = Ship(self) #把 Ship 类实例化，放进游戏里
+        self.bullets = pygame.sprite.Group()#给飞船准备一个“弹夹”
+        self.firing = False
+        self.last_shot_time = 0
+
+        self.aliens = pygame.sprite.Group()
+        self.stats = GameStats(self)#计分板
+        self.play_button = Button(self, "Play")# 创建 Play 按钮
+        self._create_fleet()#多个
+        # 舰队的移动设置
+        self.alien_speed = 1
+        self.fleet_drop_speed = 10
+        self.fleet_direction = 1  # 1 代表向右移动，-1 代表向左移动
+
+        '''alien = Alien(self)
+        self.aliens.add(alien)#单个'''
+        self.clock = pygame.time.Clock()
+
+    def _check_fleet_edges(self):
+        """如果有任何一个外星人到达边缘，就让整个舰队下移，并改变方向"""
+        for alien in self.aliens.sprites():
+            if alien.check_edges():
+                # 让所有外星人往下掉一点
+                for a in self.aliens.sprites():
+                    a.rect.y += self.fleet_drop_speed
+                # 掉完之后，全体反方向移动
+                self.fleet_direction *= -1
+                break
+
+    def _update_aliens(self):
+        """检查是否有外星人到达边缘，然后更新所有外星人的位置"""
+        self._check_fleet_edges()
+        # 让编组里的所有外星人都执行移动动作
+        self.aliens.update(self.alien_speed, self.fleet_direction)
+        
+        # 检查是否有外星人撞到了飞船
+        if pygame.sprite.spritecollideany(self.ship, self.aliens):
+            self._ship_hit()
+            
+        # 检查是否有外星人到达了屏幕底部
+        screen_rect = self.screen.get_rect()
+        for alien in self.aliens.sprites():
+            if alien.rect.bottom >= screen_rect.bottom:
+                # 只要有一个外星人触底，就等同于飞船被撞毁，执行死亡后果
+                self._ship_hit()
+                break
+            
+    #处理“挨揍”的全新动作
+    def _ship_hit(self):
+        """响应飞船被外星人撞到，或者外星人到达底部"""
+        if self.stats.ships_left > 0:
+            self.stats.ships_left -= 1  # 扣除一条命
+            self.bullets.empty()        # 清空屏幕上的子弹
+            self.aliens.empty()         # 清空屏幕上的外星人
+            
+            # 把飞船重新放回屏幕底部中央，并重新召唤满编舰队
+            self.ship.rect.midbottom = self.screen.get_rect().midbottom
+            self._create_fleet()
+            
+            # 暂停 0.5 秒钟，让玩家喘口气知道自己死了一次
+            time.sleep(0.5)
+        else:
+            # 命用光了，游戏停止，显示鼠标，让玩家可以重新点 Play 按钮
+            self.stats.game_active = False
+            pygame.mouse.set_visible(True)
+
+    def _update_bullets(self):
+        """更新子弹的位置并删除消失的子弹"""
+        # 让所有子弹往上飞
+        self.bullets.update()
+        
+        # 删除飞出屏幕边缘的子弹（不然它们会在后台无限飞，让电脑越来越卡）
+        for bullet in self.bullets.copy():
+            if bullet.rect.bottom <= 0:
+                self.bullets.remove(bullet)
+        # 检查是否有子弹击中了外星人，如果有，就让子弹和外星人一起消失
+        collisions = pygame.sprite.groupcollide(self.bullets, self.aliens, True, True)
+        # 如果外星人军团死光了（编组为空）
+        if not self.aliens:
+            # 清空屏幕上可能还剩下的残余子弹
+            self.bullets.empty()
+            # 重新召唤一支满编的全新舰队！
+            self._create_fleet()
+    def _create_fleet(self):
+        """自动计算屏幕大小，并排满外星人舰队"""
+        # 1. 先造一个“模版”用来测量单兵尺寸
+        alien = Alien(self)
+        alien_width = alien.rect.width
+        alien_height = alien.rect.height
+        
+        # 2. 计算横向能排多少个（左右各留出安全距离）
+        available_space_x = self.screen.get_rect().width - (2 * alien_width)
+        number_aliens_x = available_space_x // (2 * alien_width)
+        
+        # 3. 计算纵向能排多少行（下方给飞船留出活动空间）
+        ship_height = self.ship.rect.height
+        available_space_y = self.screen.get_rect().height - (3 * alien_height) - ship_height
+        number_rows = available_space_y // (2 * alien_height)
+        
+        # 4. 真正开始批量制造并排好队形
+        for row_number in range(number_rows):
+            for alien_number in range(number_aliens_x):
+                new_alien = Alien(self)
+                new_alien.rect.x = alien_width + 2 * alien_width * alien_number
+                new_alien.rect.y = alien_height + 2 * alien_height * row_number
+                self.aliens.add(new_alien)
 
     def run_game(self):
         """开始游戏的主循环"""
@@ -22,12 +133,74 @@ class AlienInvasion:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     sys.exit()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RIGHT:
+                        self.ship.moving_right = True
+                    elif event.key == pygame.K_LEFT:
+                        self.ship.moving_left = True
+                    elif event.key == pygame.K_SPACE:
+                        '''制造一颗新子弹，并把它塞进弹夹里
+                        new_bullet = Bullet(self)
+                        self.bullets.add(new_bullet)'''
+                        self.firing = True
+                elif event.type == pygame.KEYUP:    #松开按键
+                    if event.key == pygame.K_RIGHT:
+                        self.ship.moving_right = False
+                    elif event.key == pygame.K_LEFT:
+                        self.ship.moving_left = False
+                    elif event.key == pygame.K_SPACE:
+                        self.firing = False
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    # 获取鼠标点击的坐标
+                    mouse_pos = pygame.mouse.get_pos()
+                    # 如果点中了 Play 按钮，而且当前游戏是停止的
+                    if self.play_button.rect.collidepoint(mouse_pos) and not self.stats.game_active:
+                        # 重置生命值，开启游戏开关，隐藏鼠标
+                        self.stats.reset_stats()
+                        self.stats.game_active = True
+                        pygame.mouse.set_visible(False)
+                        
+                        # 清空残余的子弹和外星人
+                        self.bullets.empty()
+                        self.aliens.empty()
+                        
+                        # 重新把飞船放好，召唤新舰队
+                        self._create_fleet()
+                        self.ship.rect.midbottom = self.screen.get_rect().midbottom
 
+            if self.firing:
+                # 获取现在的游戏时间
+                current_time = pygame.time.get_ticks()
+                # 如果距离上次开火超过了 200 毫秒（数字越大，子弹越稀疏）
+                if current_time - self.last_shot_time > 200:
+                    new_bullet = Bullet(self)
+                    self.bullets.add(new_bullet)
+                    # 记录下这次真正的开火时间
+                    self.last_shot_time = current_time
+            # 只有游戏激活时，才更新这些物体的位置
+            if self.stats.game_active:
+                self.ship.update()
+                self.bullets.update()#每次循环时让子弹“飞起来”
+                self._update_bullets()
+                self._update_aliens()  # 呼叫外星人大军移动！
+            
             # 2. 每次循环时都重绘屏幕背景
             self.screen.fill(self.settings.bg_color)
+            for bullet in self.bullets.sprites():
+                bullet.draw_bullet()
+            #外星人军团（目前只有一个）
+            self.aliens.draw(self.screen)
+
+            # 如果游戏处于非活动状态，就绘制 Play 按钮
+            if not self.stats.game_active:
+                self.play_button.draw_button()
+
+
+            self.ship.blitme()#每次刷新屏幕时，都调用飞船的专属画图动作
 
             # 3. 让最近绘制的屏幕可见
             pygame.display.flip()
+            self.clock.tick(250)
 
 if __name__ == '__main__':
     # 创建游戏实例并运行游戏
