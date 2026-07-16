@@ -7,6 +7,10 @@ from alien import Alien
 import time
 from game_stats import GameStats
 from button import Button
+from scoreboard import Scoreboard
+
+
+
 class AlienInvasion:
     """管理游戏资源和行为的总体类"""
 
@@ -27,16 +31,40 @@ class AlienInvasion:
         self.aliens = pygame.sprite.Group()
         self.stats = GameStats(self)#计分板
         self.play_button = Button(self, "Play")# 创建 Play 按钮
+        # 创建存储游戏统计信息的实例，并创建记分牌
+        self.sb = Scoreboard(self)
+        
+        
         self._create_fleet()#多个
         # 舰队的移动设置
-        self.alien_speed = 1
+        self.alien_speed = 1.0
         self.fleet_drop_speed = 10
         self.fleet_direction = 1  # 1 代表向右移动，-1 代表向左移动
 
+        # 难度升级与分数倍率设置
+        self.speedup_scale = 1.2  # 每次升级，外星人提速 20%
+        self.alien_points = 50    # 第一波外星人的基础击杀分数
+        self.score_scale = 1.5    # 每次升级，击杀分数变为 1.5 倍
+
         '''alien = Alien(self)
         self.aliens.add(alien)#单个'''
-        self.clock = pygame.time.Clock()
 
+        self.clock = pygame.time.Clock()
+        # 初始化 Pygame 的混音器
+        pygame.mixer.init()
+        
+        # 加载背景音乐和音效
+        pygame.mixer.music.load('sounds/bg_music.ogg')
+        self.laser_sound = pygame.mixer.Sound('sounds/laser.ogg')
+        self.explosion_sound = pygame.mixer.Sound('sounds/explosion.ogg')
+        
+        # 设置音量（0.0 到 1.0 之间）
+        pygame.mixer.music.set_volume(0.3)
+        self.laser_sound.set_volume(0.4)
+        self.explosion_sound.set_volume(0.5)
+
+        # 让背景音乐无限循环播放（-1 代表无限循环）
+        pygame.mixer.music.play(-1)
     def _check_fleet_edges(self):
         """如果有任何一个外星人到达边缘，就让整个舰队下移，并改变方向"""
         for alien in self.aliens.sprites():
@@ -71,6 +99,7 @@ class AlienInvasion:
         """响应飞船被外星人撞到，或者外星人到达底部"""
         if self.stats.ships_left > 0:
             self.stats.ships_left -= 1  # 扣除一条命
+            self.sb.prep_ships()        # 立刻刷新左上角的小飞船！
             self.bullets.empty()        # 清空屏幕上的子弹
             self.aliens.empty()         # 清空屏幕上的外星人
             
@@ -96,12 +125,28 @@ class AlienInvasion:
                 self.bullets.remove(bullet)
         # 检查是否有子弹击中了外星人，如果有，就让子弹和外星人一起消失
         collisions = pygame.sprite.groupcollide(self.bullets, self.aliens, True, True)
+        if collisions:
+            self.explosion_sound.play()  #只要发生碰撞，立刻播放轰隆声！
+            # 遍历字典里的所有击中记录，确保每个死亡的外星人都算分
+            for aliens_hit in collisions.values():
+                self.stats.score += self.alien_points * len(aliens_hit)
+            self.sb.prep_score()
+            if collisions:
+                # 遍历字典里的所有击中记录，确保每个死亡的外星人都算分
+                for aliens_hit in collisions.values():
+                    self.stats.score += self.alien_points * len(aliens_hit)
+                self.sb.prep_score()
+                self.sb.check_high_score()  # 新增：立刻检查是否破了纪录！
+            
         # 如果外星人军团死光了（编组为空）
         if not self.aliens:
             # 清空屏幕上可能还剩下的残余子弹
             self.bullets.empty()
             # 重新召唤一支满编的全新舰队！
             self._create_fleet()
+            # 升级：提升舰队速度，并增加下一波的击杀奖励！
+            self.alien_speed *= self.speedup_scale
+            self.alien_points = int(self.alien_points * self.score_scale)
     def _create_fleet(self):
         """自动计算屏幕大小，并排满外星人舰队"""
         # 1. 先造一个“模版”用来测量单兵尺寸
@@ -157,6 +202,16 @@ class AlienInvasion:
                     if self.play_button.rect.collidepoint(mouse_pos) and not self.stats.game_active:
                         # 重置生命值，开启游戏开关，隐藏鼠标
                         self.stats.reset_stats()
+                        if self.play_button.rect.collidepoint(mouse_pos) and not self.stats.game_active:
+                            self.stats.reset_stats()
+                            self.stats.game_active = True
+                            pygame.mouse.set_visible(False)
+                        
+                        # 新增：重置游戏的初始速度和初始分数
+                        self.alien_speed = 1.0
+                        self.alien_points = 50
+                        self.sb.prep_score()
+                        self.sb.prep_ships()  # 点击重玩时，恢复满血的3艘飞船
                         self.stats.game_active = True
                         pygame.mouse.set_visible(False)
                         
@@ -177,6 +232,7 @@ class AlienInvasion:
                     self.bullets.add(new_bullet)
                     # 记录下这次真正的开火时间
                     self.last_shot_time = current_time
+                    self.laser_sound.play()  # 每次制造子弹，就播放一次激光声！
             # 只有游戏激活时，才更新这些物体的位置
             if self.stats.game_active:
                 self.ship.update()
@@ -188,8 +244,11 @@ class AlienInvasion:
             self.screen.fill(self.settings.bg_color)
             for bullet in self.bullets.sprites():
                 bullet.draw_bullet()
+
             #外星人军团（目前只有一个）
             self.aliens.draw(self.screen)
+            # 画出得分
+            self.sb.show_score()
 
             # 如果游戏处于非活动状态，就绘制 Play 按钮
             if not self.stats.game_active:

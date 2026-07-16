@@ -17,6 +17,9 @@ class Alien(Sprite):
         # 让每个外星人最初都出现在屏幕左上角附近
         self.rect.x = self.rect.width
         self.rect.y = self.rect.height
+
+        # 新增：将横坐标转换为小数，方便进行细微的加速计算
+        self.x = float(self.rect.x)
     def check_edges(self):
         """如果外星人碰到了屏幕边缘，就返回 True"""
         screen_rect = self.screen.get_rect()
@@ -24,6 +27,11 @@ class Alien(Sprite):
             return True
         return False
 
+    '''def update(self, speed, direction):
+        """向左或向右移动外星人"""
+        self.rect.x += speed * direction'''
+
     def update(self, speed, direction):
         """向左或向右移动外星人"""
-        self.rect.x += speed * direction
+        self.x += speed * direction
+        self.rect.x = self.x
