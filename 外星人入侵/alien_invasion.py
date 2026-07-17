@@ -8,7 +8,8 @@ import time
 from game_stats import GameStats
 from button import Button
 from scoreboard import Scoreboard
-
+import random
+from alien_bomb import AlienBomb
 
 
 class AlienInvasion:
@@ -25,6 +26,7 @@ class AlienInvasion:
         pygame.display.set_caption("外星人入侵")
         self.ship = Ship(self) #把 Ship 类实例化，放进游戏里
         self.bullets = pygame.sprite.Group()#给飞船准备一个“弹夹”
+        self.alien_bombs = pygame.sprite.Group()#为外星人炸弹建立一个专属空弹夹：
         self.firing = False
         self.last_shot_time = 0
 
@@ -93,15 +95,24 @@ class AlienInvasion:
                 # 只要有一个外星人触底，就等同于飞船被撞毁，执行死亡后果
                 self._ship_hit()
                 break
-            
+        # 新的智能投弹机制：确保编组里还有存活的外星人
+        if self.aliens.sprites():
+            # 整个外星人舰队每刷新一帧，只有 3% 的总概率投下一颗炸弹
+            if random.randint(1, 100) <= 3:
+                # 随机抽取一个外星人作为投弹手，打破“死板的竖线”
+                random_alien = random.choice(self.aliens.sprites())
+                new_bomb = AlienBomb(self, random_alien)
+                self.alien_bombs.add(new_bomb)
     #处理“挨揍”的全新动作
     def _ship_hit(self):
         """响应飞船被外星人撞到，或者外星人到达底部"""
         if self.stats.ships_left > 0:
             self.stats.ships_left -= 1  # 扣除一条命
             self.sb.prep_ships()        # 立刻刷新左上角的小飞船！
+
             self.bullets.empty()        # 清空屏幕上的子弹
             self.aliens.empty()         # 清空屏幕上的外星人
+            self.alien_bombs.empty()
             
             # 把飞船重新放回屏幕底部中央，并重新召唤满编舰队
             self.ship.rect.midbottom = self.screen.get_rect().midbottom
@@ -147,6 +158,20 @@ class AlienInvasion:
             # 升级：提升舰队速度，并增加下一波的击杀奖励！
             self.alien_speed *= self.speedup_scale
             self.alien_points = int(self.alien_points * self.score_scale)
+    def _update_alien_bombs(self):
+        """更新外星人炸弹的位置，处理越界和碰撞"""
+        self.alien_bombs.update()
+        
+        # 删除掉出屏幕底部的炸弹（回收内存）
+        screen_rect = self.screen.get_rect()
+        for bomb in self.alien_bombs.copy():
+            if bomb.rect.top >= screen_rect.bottom:
+                self.alien_bombs.remove(bomb)
+                
+        # 检查炸弹是否精准命中了你的飞船！
+        if pygame.sprite.spritecollideany(self.ship, self.alien_bombs):
+            self._ship_hit()
+
     def _create_fleet(self):
         """自动计算屏幕大小，并排满外星人舰队"""
         # 1. 先造一个“模版”用来测量单兵尺寸
@@ -167,10 +192,12 @@ class AlienInvasion:
         for row_number in range(number_rows):
             for alien_number in range(number_aliens_x):
                 new_alien = Alien(self)
-                new_alien.rect.x = alien_width + 2 * alien_width * alien_number
+                # 计算出精确的小数坐标，并存入 self.x 中
+                new_alien.x = float(alien_width + 2 * alien_width * alien_number)
+                new_alien.rect.x = new_alien.x  # 让物理框跟上小数坐标
                 new_alien.rect.y = alien_height + 2 * alien_height * row_number
+                
                 self.aliens.add(new_alien)
-
     def run_game(self):
         """开始游戏的主循环"""
         while True:
@@ -218,6 +245,7 @@ class AlienInvasion:
                         # 清空残余的子弹和外星人
                         self.bullets.empty()
                         self.aliens.empty()
+                        self.alien_bombs.empty()
                         
                         # 重新把飞船放好，召唤新舰队
                         self._create_fleet()
@@ -239,6 +267,7 @@ class AlienInvasion:
                 self.bullets.update()#每次循环时让子弹“飞起来”
                 self._update_bullets()
                 self._update_aliens()  # 呼叫外星人大军移动！
+                self._update_alien_bombs()  # 让炸弹飞起来
             
             # 2. 每次循环时都重绘屏幕背景
             self.screen.fill(self.settings.bg_color)
@@ -247,6 +276,9 @@ class AlienInvasion:
 
             #外星人军团（目前只有一个）
             self.aliens.draw(self.screen)
+            # 画出外星人的红色炸弹
+            for bomb in self.alien_bombs.sprites():
+                bomb.draw_bomb()
             # 画出得分
             self.sb.show_score()
 
