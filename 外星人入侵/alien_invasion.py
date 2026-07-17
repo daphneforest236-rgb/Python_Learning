@@ -84,17 +84,17 @@ class AlienInvasion:
         # 让编组里的所有外星人都执行移动动作
         self.aliens.update(self.alien_speed, self.fleet_direction)
         
-        # 检查是否有外星人撞到了飞船
-        if pygame.sprite.spritecollideany(self.ship, self.aliens):
+        # 检查是否有外星人撞到了飞船 (dokill=True 会直接销毁这只外星人)
+        if pygame.sprite.spritecollide(self.ship, self.aliens, True):
             self._ship_hit()
             
         # 检查是否有外星人到达了屏幕底部
         screen_rect = self.screen.get_rect()
         for alien in self.aliens.sprites():
             if alien.rect.bottom >= screen_rect.bottom:
-                # 只要有一个外星人触底，就等同于飞船被撞毁，执行死亡后果
+                # 只要有外星人触底，手动将它删除（防止它在底部一直触发），然后扣血
+                self.aliens.remove(alien)
                 self._ship_hit()
-                break
         # 新的智能投弹机制：确保编组里还有存活的外星人
         if self.aliens.sprites():
             # 整个外星人舰队每刷新一帧，只有 3% 的总概率投下一颗炸弹
@@ -110,7 +110,7 @@ class AlienInvasion:
             self.stats.ships_left -= 1  # 扣除一条命
             self.sb.prep_ships()        # 立刻刷新左上角的小飞船！
 
-            self.bullets.empty()        # 清空屏幕上的子弹
+            '''self.bullets.empty()        # 清空屏幕上的子弹
             self.aliens.empty()         # 清空屏幕上的外星人
             self.alien_bombs.empty()
             
@@ -119,7 +119,7 @@ class AlienInvasion:
             self._create_fleet()
             
             # 暂停 0.5 秒钟，让玩家喘口气知道自己死了一次
-            time.sleep(0.5)
+            time.sleep(0.5)'''
         else:
             # 命用光了，游戏停止，显示鼠标，让玩家可以重新点 Play 按钮
             self.stats.game_active = False
@@ -168,8 +168,8 @@ class AlienInvasion:
             if bomb.rect.top >= screen_rect.bottom:
                 self.alien_bombs.remove(bomb)
                 
-        # 检查炸弹是否精准命中了你的飞船！
-        if pygame.sprite.spritecollideany(self.ship, self.alien_bombs):
+        # 检查炸弹是否精准命中了你的飞船！(dokill=True 会直接销毁撞你的炸弹)
+        if pygame.sprite.spritecollide(self.ship, self.alien_bombs, True):
             self._ship_hit()
 
     def _create_fleet(self):
