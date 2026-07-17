@@ -10,7 +10,7 @@ from button import Button
 from scoreboard import Scoreboard
 import random
 from alien_bomb import AlienBomb
-
+from floating_text import FloatingText
 
 class AlienInvasion:
     """管理游戏资源和行为的总体类"""
@@ -27,6 +27,7 @@ class AlienInvasion:
         self.ship = Ship(self) #把 Ship 类实例化，放进游戏里
         self.bullets = pygame.sprite.Group()#给飞船准备一个“弹夹”
         self.alien_bombs = pygame.sprite.Group()#为外星人炸弹建立一个专属空弹夹：
+        self.floating_texts = pygame.sprite.Group()#装满屏特效的空盒子
         self.firing = False
         self.last_shot_time = 0
 
@@ -95,21 +96,32 @@ class AlienInvasion:
                 # 只要有外星人触底，手动将它删除（防止它在底部一直触发），然后扣血
                 self.aliens.remove(alien)
                 self._ship_hit()
+                
         # 新的智能投弹机制：确保编组里还有存活的外星人
         if self.aliens.sprites():
             # 整个外星人舰队每刷新一帧，只有 3% 的总概率投下一颗炸弹
             if random.randint(1, 100) <= 3:
-                # 随机抽取一个外星人作为投弹手，打破“死板的竖线”
-                random_alien = random.choice(self.aliens.sprites())
-                new_bomb = AlienBomb(self, random_alien)
-                self.alien_bombs.add(new_bomb)
+                # 找出最前排（每一列最底部）的外星人
+                frontline_aliens = {}
+                for alien in self.aliens.sprites():
+                    # 以 x 坐标为准分组，找出该组中 y 坐标最大（最靠下）的外星人
+                    if alien.rect.x not in frontline_aliens or alien.rect.y > frontline_aliens[alien.rect.x].rect.y:
+                        frontline_aliens[alien.rect.x] = alien
+                
+                # 只要前排还有外星人，就从中随机选一个投弹
+                if frontline_aliens:
+                    random_alien = random.choice(list(frontline_aliens.values()))
+                    new_bomb = AlienBomb(self, random_alien)
+                    self.alien_bombs.add(new_bomb)
     #处理“挨揍”的全新动作
     def _ship_hit(self):
         """响应飞船被外星人撞到，或者外星人到达底部"""
         if self.stats.ships_left > 0:
             self.stats.ships_left -= 1  # 扣除一条命
             self.sb.prep_ships()        # 立刻刷新左上角的小飞船！
-
+            self.floating_texts.empty() # 清空屏幕上的特效字
+            self.ship.speed = 3.0       # 把飞船速度打回原形
+            
             '''self.bullets.empty()        # 清空屏幕上的子弹
             self.aliens.empty()         # 清空屏幕上的外星人
             self.alien_bombs.empty()
@@ -144,11 +156,21 @@ class AlienInvasion:
             self.sb.prep_score()
             if collisions:
                 # 遍历字典里的所有击中记录，确保每个死亡的外星人都算分
+                # 遍历字典里的所有击中记录，确保每个死亡的外星人都算分
                 for aliens_hit in collisions.values():
+                    # 新增：给每一个死掉的外星人都爆出一次特效，并叠加移速
+                    for alien in aliens_hit:
+                        # 真实速度微调（加 10 会导致飞船失控，所以真实底层加 0.1）
+                        self.ship.speed += 0.1
+                        
+                        # 在它死掉的位置爆出特效字样
+                        ft = FloatingText(self, "SPEED +10", alien.rect.center)
+                        self.floating_texts.add(ft)
+                        
                     self.stats.score += self.alien_points * len(aliens_hit)
-                self.sb.prep_score()
-                self.sb.check_high_score()  # 新增：立刻检查是否破了纪录！
-            
+                    self.sb.prep_score()
+                    self.sb.check_high_score()  # 新增：立刻检查是否破了纪录！
+                
         # 如果外星人军团死光了（编组为空）
         if not self.aliens:
             # 清空屏幕上可能还剩下的残余子弹
@@ -268,6 +290,12 @@ class AlienInvasion:
                 self._update_bullets()
                 self._update_aliens()  # 呼叫外星人大军移动！
                 self._update_alien_bombs()  # 让炸弹飞起来
+
+                # 更新悬浮文字，并删除已经过期的文字
+                self.floating_texts.update()
+                for ft in self.floating_texts.copy():
+                    if ft.timer <= 0:
+                        self.floating_texts.remove(ft)
             
             # 2. 每次循环时都重绘屏幕背景
             self.screen.fill(self.settings.bg_color)
@@ -289,6 +317,8 @@ class AlienInvasion:
 
             self.ship.blitme()#每次刷新屏幕时，都调用飞船的专属画图动作
 
+            # 画出悬浮特效文字
+            self.floating_texts.draw(self.screen)
             # 3. 让最近绘制的屏幕可见
             pygame.display.flip()
             self.clock.tick(250)
