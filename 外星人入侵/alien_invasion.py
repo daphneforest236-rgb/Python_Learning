@@ -24,6 +24,16 @@ class AlienInvasion:
         self.screen = pygame.display.set_mode(
             (self.settings.screen_width, self.settings.screen_height))
         pygame.display.set_caption("外星人入侵")
+        # ==========================================
+        # 新增代码：加载并缩放背景图片
+        # ==========================================
+        self.bg_image = pygame.image.load('images/bg_image.png')
+        # 这一步是为了确保背景图的尺寸能完美铺满你的游戏窗口
+        self.bg_image = pygame.transform.scale(
+            self.bg_image, 
+            (self.settings.screen_width, self.settings.screen_height)
+        )
+        # ==========================================
         self.ship = Ship(self) #把 Ship 类实例化，放进游戏里
         self.bullets = pygame.sprite.Group()#给飞船准备一个“弹夹”
         self.alien_bombs = pygame.sprite.Group()#为外星人炸弹建立一个专属空弹夹：
@@ -298,7 +308,11 @@ class AlienInvasion:
                         self.floating_texts.remove(ft)
             
             # 2. 每次循环时都重绘屏幕背景
-            self.screen.fill(self.settings.bg_color)
+            # ---> 删掉或者注释掉原来这行涂颜色的代码 <---
+            # self.screen.fill(self.settings.bg_color)
+            
+            # ---> 新增这行：把星空背景图画在坐标 (0, 0) 的位置 <---
+            self.screen.blit(self.bg_image, (0, 0))
             for bullet in self.bullets.sprites():
                 bullet.draw_bullet()
 
