@@ -173,7 +173,7 @@ class AlienInvasion:
                         # 真实速度微调（加 10 会导致飞船失控，所以真实底层加 0.1）
                         self.ship.speed += 0.1
                         
-                        # 在它死掉的位置爆出特效字样
+                        # 爆出文字特效
                         ft = FloatingText(self, "SPEED +10", alien.rect.center)
                         self.floating_texts.add(ft)
                         
