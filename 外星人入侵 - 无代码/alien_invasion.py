@@ -33,8 +33,8 @@ class AlienInvasion:
         self.floating_texts = pygame.sprite.Group()
         self.firing = False
         self.last_shot_time = 0
-
         self.aliens = pygame.sprite.Group()
+
         self.stats = GameStats(self)
         self.play_button = Button(self, "Play")
         self.sb = Scoreboard(self)
@@ -50,7 +50,6 @@ class AlienInvasion:
 
         self.clock = pygame.time.Clock()
         pygame.mixer.init()
-        
         pygame.mixer.music.load('sounds/bg_music.ogg')
         self.laser_sound = pygame.mixer.Sound('sounds/laser.ogg')
         self.explosion_sound = pygame.mixer.Sound('sounds/explosion.ogg')
@@ -80,10 +79,10 @@ class AlienInvasion:
         for alien in self.aliens.sprites():
             if alien.rect.bottom >= screen_rect.bottom:
                 self.aliens.remove(alien)
-                self._ship_hit()
+                #self._ship_hit()
                 
         if self.aliens.sprites():
-            if random.randint(1, 100) <= 3:
+            if random.randint(1, 100) <= 1:
                 frontline_aliens = {}
                 for alien in self.aliens.sprites():
                     if alien.rect.x not in frontline_aliens or alien.rect.y > frontline_aliens[alien.rect.x].rect.y:
@@ -114,19 +113,14 @@ class AlienInvasion:
         if collisions:
             self.explosion_sound.play()
             for aliens_hit in collisions.values():
+                for alien in aliens_hit:
+                    self.ship.speed += 0.1
+                    ft = FloatingText(self, "SPEED +10", alien.rect.center)
+                    self.floating_texts.add(ft)
+                    
                 self.stats.score += self.alien_points * len(aliens_hit)
-            self.sb.prep_score()
-            if collisions:
-                for aliens_hit in collisions.values():
-                    for alien in aliens_hit:
-                        self.ship.speed += 0.1
-                        
-                        ft = FloatingText(self, "SPEED +10", alien.rect.center)
-                        self.floating_texts.add(ft)
-                        
-                    self.stats.score += self.alien_points * len(aliens_hit)
-                    self.sb.prep_score()
-                    self.sb.check_high_score()
+                self.sb.prep_score()
+                self.sb.check_high_score()
             
         if not self.aliens:
             self.bullets.empty()
@@ -147,6 +141,7 @@ class AlienInvasion:
 
     def _create_fleet(self):
         alien = Alien(self)
+
         alien_width = alien.rect.width
         alien_height = alien.rect.height
         
